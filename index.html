@@ -96,6 +96,36 @@
 </style>
 
 <meta name="mulia-persistent-login" content="enabled-until-logout">
+
+<!-- CorelDRAW PDF compatibility patch -->
+<style id="coreldraw-pdf-patch">
+@media print{
+  *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+    text-shadow:none!important;
+    filter:none!important;
+    backdrop-filter:none!important;
+  }
+  body{image-rendering:auto}
+  svg{shape-rendering:geometricPrecision;text-rendering:geometricPrecision}
+}
+</style>
+<script>
+window.__corelPDFOptions={
+  flattenTransparency:true,
+  preferVectorText:true,
+  avoidFilters:true
+};
+window.addEventListener('beforeprint',()=>{
+ document.querySelectorAll('*').forEach(el=>{
+   el.style.filter='none';
+   el.style.backdropFilter='none';
+   el.style.textShadow='none';
+ });
+});
+</script>
+
 </head>
 <body>
 
