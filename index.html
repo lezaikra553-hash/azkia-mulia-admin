@@ -96,6 +96,7 @@
 </style>
 
 <meta name="mulia-persistent-login" content="enabled-until-logout">
+<meta name="azkia-stable-version" content="2.0.2">
 
 <!-- CorelDRAW PDF compatibility patch -->
 <style id="coreldraw-pdf-patch">
@@ -126,6 +127,10 @@ window.addEventListener('beforeprint',()=>{
 });
 </script>
 
+
+<style id="azkia-stable-v202">
+.dot.busy{background:#f59e0b!important;box-shadow:0 0 0 3px rgba(245,158,11,.18)}
+</style>
 </head>
 <body>
 
@@ -141,7 +146,7 @@ window.addEventListener('beforeprint',()=>{
   </div>
 </div>
 <div class="portalTop">
-  <div class="brand">PT. AZKIA MULIA PERADA <span class="portalVersion">ADMIN APPLICATION</span><small>Penawaran • Invoice • Kas Besar • Absensi & Payroll</small></div>
+  <div class="brand">PT. AZKIA MULIA PERADA <span class="portalVersion">AZKIA V2.0.2 STABLE</span><small>Penawaran • Invoice • Kas Besar • Absensi & Payroll</small></div>
   <button id="btnDashboard" class="tabBtn active" onclick="openApp('dashboard')">📊 Dashboard</button>
 <button id="btnPenawaran" class="tabBtn" onclick="openApp('penawaran')">📄 Penawaran & Invoice</button>
   <button id="btnKas" class="tabBtn" onclick="openApp('kas')">💰 Kas Besar</button>
@@ -299,7 +304,7 @@ function openApp(app){
   const btnMap={dashboard:'btnDashboard',penawaran:'btnPenawaran',kas:'btnKas',absensi:'btnAbsensi',bagihasil:'btnBagiHasil'};
   const btn=document.getElementById(btnMap[app]);if(btn)btn.classList.add('active');
   if(app==='penawaran')loadFrame('framePenawaran',APP_PENAWARAN_B64);
-  if(app==='kas'){portalSyncPayrollFromStorage(true);loadFrame('frameKas',APP_KAS_B64)}
+  if(app==='kas'){loadFrame('frameKas',APP_KAS_B64)}
   if(app==='absensi')loadFrame('frameAbsensi',APP_ABSENSI_B64);
   if(app==='dashboard'){try{window.MuliaUnifiedSync?.refresh()}catch(e){};try{renderEnterprise()}catch(e){}}
   if(app==='bagihasil'){try{bhRenderSimple()}catch(e){console.error(e)}}
@@ -324,40 +329,39 @@ let portalUploadTimer = null;
 let portalLastHash = '';
 let portalSyncBusy = false;
 
-function portalSetStatus(txt, ok=false){
+function portalSetStatus(txt, state=false){
   const st=document.getElementById('portalGoogleStatus');
   const dot=document.getElementById('portalDot');
   if(st) st.textContent=txt;
-  if(dot) dot.classList.toggle('on', !!ok);
+  if(dot){
+    dot.classList.remove('on','busy');
+    if(state===true || state==='ok') dot.classList.add('on');
+    else if(state==='busy') dot.classList.add('busy');
+  }
 }
+const AZKIA_SYNC_EXACT_KEYS = new Set([
+  'AP_SALES_DB_V1','AP_BAGI_HASIL_SIMPLE_V1','AP_COMPANY_CODE',
+  'AP_COMPANY_CONTRACT_V1','AP_SCHEMA_VERSION','AP_KAS_BESAR_ACTIVE_DB',
+  'AP_KAS_LAST_SAVED_AT','AP_KAS_V8_ENTERPRISE','AP_ENTERPRISE_V2',
+  'AP_ABSENSI_GAJI_V4','AP_ABSENSI_GAJI_V3','AZKIA_MULIA_PAYROLL_SYNC_STATUS_V1'
+]);
 function portalSyncAllowedKey(k){
-  return (
-    k==='AP_SALES_DB_V1' ||
-    k==='AP_BAGI_HASIL_SIMPLE_V1' ||
-    k==='AP_COMPANY_CODE' ||
-    k==='AP_COMPANY_CONTRACT_V1' ||
-    k==='AP_SCHEMA_VERSION' ||
-    k==='AP_KAS_BESAR_ACTIVE_DB' ||
-    k==='AP_KAS_LAST_SAVED_AT' ||
-    k==='AP_KAS_V8_ENTERPRISE' ||
-    k==='kasBesarBM_V8_PIN_SHA256' ||
-    k==='kasBesarBM_V8_ROLE' ||
-    k==='kasBesarBM_V8_AUTO_BACKUP' ||
-    k==='kasBesarBM_V8_GOOGLE_USER' ||
-    k==='MULIA_MIGRATED_OLD_KEYS_V1' ||
-    k==='AP_ABSENSI_GAJI_V4' ||
-    k==='AP_ABSENSI_GAJI_V3' ||
-    k.startsWith('berkah_absensi_') ||
-    k.startsWith('PENAWARAN_') ||
-    k.startsWith('INVOICE_') ||
-    k.startsWith('MULIA_') ||
-    k.startsWith('QUOTE_') ||
-    k.startsWith('BERKAH_MULIA_')
-  ) && !k.includes('GOOGLE_TOKEN') && !k.includes('PORTAL_GOOGLE_TOKEN') && !k.includes('PORTAL_OK');
+  if(typeof k!=='string') return false;
+  if(k.includes('GOOGLE_TOKEN') || k.includes('PORTAL_GOOGLE_TOKEN') || k.includes('PORTAL_OK')) return false;
+  return AZKIA_SYNC_EXACT_KEYS.has(k) || k.startsWith('AP_') || k.startsWith('AZKIA_') || k.startsWith('azkia_');
+}
+function portalClearAzkiaStorage(){
+  const remove=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k && portalSyncAllowedKey(k)) remove.push(k);
+  }
+  remove.forEach(k=>localStorage.removeItem(k));
+  return remove.length;
 }
 
 /* === INTEGRASI ABSENSI -> KAS BESAR === */
-const PORTAL_PAYROLL_SYNC_KEY='AP_PAYROLL_SYNC_STATUS_V1';
+const PORTAL_PAYROLL_SYNC_KEY='AZKIA_MULIA_PAYROLL_SYNC_STATUS_V1';
 function portalPayrollParseNum(v){return Number(String(v??'').replace(',','.'))||0}
 function portalPayrollDays(period){const [y,m]=String(period||'').split('-').map(Number);return y&&m?new Date(y,m,0).getDate():30}
 function portalPayrollAtt(state,id,day){return state?.attendance?.[id]?.[state.period]?.[day]||{status:'',value:''}}
@@ -392,11 +396,12 @@ function portalPayrollCalc(state,e){
 function portalPayrollMonth(period){
  return {'2026-02':'februari','2026-03':'maret','2026-04':'april','2026-05':'mei','2026-06':'juni','2026-07':'juli','2026-08':'agustus','2026-09':'september','2026-10':'oktober','2026-11':'november','2026-12':'desember','2027-01':'januari'}[period]||''
 }
-function portalPayrollDate(period){const [y,m]=period.split('-').map(Number),d=new Date(y,m,0).getDate();return String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+y}
+function portalPayrollDate(period,paymentIso=''){if(/^\d{4}-\d{2}-\d{2}$/.test(paymentIso)){const [y,m,d]=paymentIso.split('-');return d+'/'+m+'/'+y}const [y,m]=period.split('-').map(Number),d=new Date(y,m,0).getDate();return String(d).padStart(2,'0')+'/'+String(m).padStart(2,'0')+'/'+y}
 function portalPayrollLabel(period){const n=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],[y,m]=period.split('-').map(Number);return n[m-1]+' '+y}
 function portalReceivePayroll(state,opt={}){
  const silent=opt.silent!==false;
  try{
+   if(silent && opt.force!==true) return {ok:false,skipped:true,reason:'Payroll hanya dicatat melalui tindakan eksplisit.'};
    if(!state?.period)throw new Error('Periode payroll belum tersedia.');
    const mk=portalPayrollMonth(state.period);if(!mk)throw new Error('Periode '+state.period+' belum tersedia di Kas Besar.');
    const key='AP_KAS_BESAR_ACTIVE_DB',fallback='AP_KAS_V8_ENTERPRISE';
@@ -404,7 +409,16 @@ function portalReceivePayroll(state,opt={}){
    const db=raw?JSON.parse(raw):{fileName:'Kas Besar Terintegrasi',loadedAt:'',sheets:[],raw:{},summary:{},transactions:{},materials:[],receivables:[],rekap:{},bagi:{},note:[]};
    db.transactions=db.transactions||{};db.transactions[mk]=db.transactions[mk]||{pemasukan:[],operasional:[],indra:[],andre:[]};
    db.transactions[mk].operasional=(db.transactions[mk].operasional||[]).filter(x=>!(x?.source==='ABSENSI_PAYROLL'&&x.payrollPeriod===state.period));
-   let total=0,count=0;const date=portalPayrollDate(state.period),label=portalPayrollLabel(state.period);
+   let total=0,count=0;const label=portalPayrollLabel(state.period);
+   let paymentIso=String(opt.paymentDate||'').trim();
+   if(!paymentIso && !silent){
+     const today=new Date();
+     const def=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+     paymentIso=prompt('Tanggal pembayaran gaji '+label+' (YYYY-MM-DD):',def)||'';
+     if(!paymentIso) return {ok:false,cancelled:true};
+     if(!/^\d{4}-\d{2}-\d{2}$/.test(paymentIso)) throw new Error('Format tanggal harus YYYY-MM-DD.');
+   }
+   const date=portalPayrollDate(state.period,paymentIso);
    (state.employees||[]).forEach(e=>{
      if(!String(e.name||'').trim())return;const r=portalPayrollCalc(state,e);if(r.net<=0)return;
      total+=r.net;count++;db.transactions[mk].operasional.push({date,description:'Gaji Karyawan - '+e.name.trim()+' - '+label,amount:r.net,source:'ABSENSI_PAYROLL',payrollPeriod:state.period,employeeId:e.id,employeeName:e.name.trim(),gross:r.gross,overtimeHours:r.hours,kasbonDeduction:r.kasbon,loanTotal:r.loanTotal,loanInstallmentDeduction:r.loanInstallment,loanInstallmentNo:r.loanInstallmentNo,loanPaid:r.loanPaid,loanRemaining:r.loanRemaining,syncedAt:new Date().toISOString()})
@@ -451,8 +465,13 @@ function portalHasBusinessData(data=portalCollectStorage()){
   }catch(e){}
   return false;
 }
+function portalStableObject(value){
+  if(Array.isArray(value)) return value.map(portalStableObject);
+  if(value && typeof value==='object') return Object.keys(value).sort().reduce((o,k)=>(o[k]=portalStableObject(value[k]),o),{});
+  return value;
+}
 async function portalHashSnapshot(data){
-  const txt=JSON.stringify(data, Object.keys(data).sort());
+  const txt=JSON.stringify(portalStableObject(data));
   const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
@@ -489,9 +508,11 @@ async function portalDownloadSyncFile(fileId){
 }
 function portalApplyStorage(data){
   if(!data || typeof data!=='object') throw new Error('Format data restore tidak valid.');
-  Object.entries(data).forEach(([k,v])=>{
-    if(portalSyncAllowedKey(k) && typeof v==='string') localStorage.setItem(k,v);
-  });
+  const clean={};
+  Object.entries(data).forEach(([k,v])=>{if(portalSyncAllowedKey(k) && typeof v==='string') clean[k]=v;});
+  if(!Object.keys(clean).length) throw new Error('Backup tidak berisi data resmi AZKIA. Restore dibatalkan.');
+  portalClearAzkiaStorage();
+  Object.entries(clean).forEach(([k,v])=>localStorage.setItem(k,v));
   localStorage.setItem('AP_PORTAL_SYNC_LOCAL_UPDATED_AT', new Date().toISOString());
 
   try{
@@ -500,15 +521,14 @@ function portalApplyStorage(data){
     document.getElementById('frameAbsensi').dataset.loaded='';
   }catch(e){}
 
-  portalSyncPayrollFromStorage(true);
   const last=sessionStorage.getItem('AZKIA_MULIA_PORTAL_LAST_APP') || 'dashboard';
   openApp(last);
 }
 async function portalBackupNow(show=true){
   if(portalSyncBusy) return;
   portalSyncBusy=true;
+  portalSetStatus('Menyinkronkan data...', 'busy');
   try{
-    portalSyncPayrollFromStorage(true);
     if(!window.PORTAL_ACCESS_TOKEN) throw new Error('Silakan Login Google dulu.');
     const data=portalCollectStorage();
     const h=await portalHashSnapshot(data);
@@ -588,7 +608,7 @@ async function portalSmartSyncAfterLogin(){
 }
 async function portalManualSync(){
   try{
-    portalSyncPayrollFromStorage(true);await portalEnsureGoogleToken(); await portalBackupNow(true);}
+    await portalEnsureGoogleToken(); await portalBackupNow(true);}
   catch(e){console.error(e); alert('Sinkron gagal karena Google belum login/izin OAuth belum aktif. Klik Login Google ulang lalu coba Sinkronkan.');}
 }
 async function portalManualRestore(){
@@ -620,7 +640,7 @@ portalStartSyncWatcher();
 if(window.PORTAL_ACCESS_TOKEN){setTimeout(portalSmartSyncAfterLogin,1200);}
 
 
-const ENT_KEY='DMA_ENTERPRISE_V2';let ent;try{ent=JSON.parse(localStorage.getItem(ENT_KEY)||'null')}catch(e){ent=null}if(!ent||typeof ent!=='object')ent={projects:[],purchasing:[],inventory:[],tasks:[],audit:[]};['projects','purchasing','inventory','tasks','audit'].forEach(k=>{if(!Array.isArray(ent[k]))ent[k]=[]});let currentOps='projects';
+const ENT_KEY='AP_ENTERPRISE_V2';let ent;try{ent=JSON.parse(localStorage.getItem(ENT_KEY)||'null')}catch(e){ent=null}if(!ent||typeof ent!=='object')ent={projects:[],purchasing:[],inventory:[],tasks:[],audit:[]};['projects','purchasing','inventory','tasks','audit'].forEach(k=>{if(!Array.isArray(ent[k]))ent[k]=[]});let currentOps='projects';
 function saveEnt(action='Data diperbarui'){ent.audit.unshift({at:new Date().toISOString(),action});ent.audit=ent.audit.slice(0,200);localStorage.setItem(ENT_KEY,JSON.stringify(ent));localStorage.setItem('AP_PORTAL_SYNC_LOCAL_UPDATED_AT',new Date().toISOString());renderOps();renderEnterprise();toast(action)}
 function money(n){return 'Rp '+Number(n||0).toLocaleString('id-ID')}
 function renderEnterprise(){
