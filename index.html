@@ -1233,7 +1233,12 @@ window.addEventListener('storage',e=>{if(['AP_KAS_BESAR_ACTIVE_DB','AP_KAS_V8_EN
 'use strict';
 if(window.__MULIA_INTEGRATION_V3__) return;
 window.__MULIA_INTEGRATION_V3__=true;
-const C={"code": "AP", "name": "PT. AZKIA MULIA PERADA", "sales": "AP_SALES_DB_V1", "kas": "AP_KAS_BESAR_ACTIVE_DB", "hr": "AP_ABSENSI_GAJI_V4", "enterprise": "AP_ENTERPRISE_V1", "profit": "AP_PROFIT_SHARING_V1", "borongan": null, "out": "Azkia_Mulia_Perada_TERINTEGRASI.html"};
+/* SAFE COMPATIBILITY PATCH: preserve old keys, populate active keys only if empty. */
+try{
+ if(!localStorage.getItem('AP_ENTERPRISE_V2') && localStorage.getItem('AP_ENTERPRISE_V1')) localStorage.setItem('AP_ENTERPRISE_V2',localStorage.getItem('AP_ENTERPRISE_V1'));
+ if(!localStorage.getItem('AP_BAGI_HASIL_SIMPLE_V1') && localStorage.getItem('AP_PROFIT_SHARING_V1')) localStorage.setItem('AP_BAGI_HASIL_SIMPLE_V1',localStorage.getItem('AP_PROFIT_SHARING_V1'));
+}catch(e){console.warn('Azkia compatibility migration skipped',e)}
+const C={"code": "AP", "name": "PT. AZKIA MULIA PERADA", "sales": "AP_SALES_DB_V1", "kas": "AP_KAS_BESAR_ACTIVE_DB", "hr": "AP_ABSENSI_GAJI_V4", "enterprise": "AP_ENTERPRISE_V2", "profit": "AP_BAGI_HASIL_SIMPLE_V1", "borongan": null, "out": "Azkia_Mulia_Perada_TERINTEGRASI.html"};
 const MONTHS=['januari','februari','maret','april','mei','juni','juli','agustus','september','oktober','november','desember'];
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0};
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch(e){return f}};
